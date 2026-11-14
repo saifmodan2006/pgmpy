@@ -299,6 +299,30 @@ def test_tan_rejects_continuous_class_node(gaussian_tan_data):
             TAN(class_node="Y", edge_weights_fn=weight_fn, show_progress=False).fit(continuous_class_data)
 
 
+@pytest.mark.parametrize("weight_fn", ["gaussian_mutual_info", "mutual_info_regression"])
+def test_tan_accepts_categorical_class_node(gaussian_tan_data, weight_fn):
+    # Fractional numeric labels stored as an explicit categorical column are
+    # discrete class labels, not continuous values.
+    categorical_class_data = gaussian_tan_data.assign(Y=pd.Categorical(np.where(gaussian_tan_data["Y"] == 1, 1.5, 0.5)))
+    est = TAN(
+        class_node="Y",
+        root_node="A",
+        edge_weights_fn=weight_fn,
+        n_jobs=1,
+        show_progress=False,
+    ).fit(categorical_class_data)
+    dag = est.causal_graph_
+
+    assert set(dag.nodes()) == {"A", "B", "C", "Y"}
+    assert set(dag.edges()) == {
+        ("Y", "A"),
+        ("Y", "B"),
+        ("Y", "C"),
+        ("A", "B"),
+        ("B", "C"),
+    }
+
+
 @pytest.fixture(autouse=True)
 def shutdown_executor():
     yield

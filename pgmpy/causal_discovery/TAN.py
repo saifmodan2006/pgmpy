@@ -111,7 +111,9 @@ class TAN(_TreeSearchMixin, BaseCausalDiscovery):
 
     _tags = {
         "name": "tan",
-        "data_types": ["discrete", "continuous"],
+        # "mixed" is valid for TAN: a discrete class node with continuous
+        # features is the normal TAN input, and the class node is never scored.
+        "data_types": ["discrete", "continuous", "mixed"],
         "identifiable_graph": "cpdag",
         "requires_target": True,
         "capability:multivariate": True,
@@ -245,10 +247,17 @@ class TAN(_TreeSearchMixin, BaseCausalDiscovery):
         """
         # Step 0: Check that the class variable is discrete, then check that
         # a named scoring function matches the data type, and resolve the
-        # edge weight computation function.
-        if type_of_target(data[class_node].to_numpy()) == "continuous":
+        # edge weight computation function. An explicit categorical dtype is
+        # discrete even with fractional numeric labels, since .to_numpy()
+        # drops the categorical metadata and type_of_target would call the
+        # labels continuous.
+        class_column = data[class_node]
+        is_categorical = isinstance(class_column.dtype, pd.CategoricalDtype)
+        if not is_categorical and type_of_target(class_column.to_numpy()) == "continuous":
             raise ValueError(f"class_node {class_node!r} must be discrete for TAN, but its values are continuous.")
-        _TreeSearchMixin._validate_edge_weights_fn(data, edge_weights_fn)
+        # The class node is never scored, so validate the scoring function
+        # against the feature columns only.
+        _TreeSearchMixin._validate_edge_weights_fn(data.drop(columns=[class_node]), edge_weights_fn)
         edge_weights_fn = _TreeSearchMixin._resolve_edge_weights_fn(edge_weights_fn)
 
         # Step 1: Compute conditional edge weights for a fully connected graph.
