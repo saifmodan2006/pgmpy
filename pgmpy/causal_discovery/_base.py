@@ -734,6 +734,11 @@ def gaussian_mutual_info(x, y):
     rho = np.corrcoef(x, y)[0, 1]
     if abs(rho) >= 1.0:
         return np.inf
+    # A correlation within rounding error of +/-1 is perfect correlation:
+    # np.corrcoef can return 1 - 1e-16 for exactly linear data, which
+    # would otherwise give a large finite value instead of inf.
+    if 1.0 - rho**2 <= 1e-15:
+        return np.inf
     return float(-0.5 * np.log(1.0 - rho**2))
 
 
